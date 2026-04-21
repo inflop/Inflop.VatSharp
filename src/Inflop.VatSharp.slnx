@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Inflop.VatSharp/Inflop.VatSharp.csproj" />
+  <Project Path="..\tests\Inflop.VatSharp.Tests\Inflop.VatSharp.Tests.csproj" />
+</Solution>
