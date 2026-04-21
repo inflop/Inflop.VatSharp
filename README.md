@@ -1,8 +1,6 @@
 # Inflop.VatSharp
 
-<p align="center">
-  <img src="assets/vatsharp-icon-128.png" alt="VatSharp" width="128" height="128" />
-</p>
+![Inflop.VatSharp Icon](https://raw.githubusercontent.com/inflop/Inflop.VatSharp/master/assets/vatsharp-icon-128.png)
 
 [![NuGet](https://img.shields.io/nuget/v/Inflop.VatSharp.svg?logo=nuget&logoColor=white)](https://www.nuget.org/packages/Inflop.VatSharp)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Inflop.VatSharp.svg?logo=nuget&logoColor=white)](https://www.nuget.org/packages/Inflop.VatSharp)
