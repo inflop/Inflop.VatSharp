@@ -8,18 +8,18 @@
 
   <PropertyGroup>
     <PackageId>Inflop.VatSharp</PackageId>
-    <Version>1.0.0</Version>
     <Authors>Inflop</Authors>
     <Description>EU VAT calculation engine for .NET — three legally distinct methods compliant with Directive 2006/112/EC. Zero dependencies. Fluent mapping API. Foreign currency support.</Description>
     <PackageTags>vat;tax;invoice;eu;calculation;dotnet;peppol;directive-2006-112</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/inflop/VatSharp</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/inflop/VatSharp</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/inflop/Inflop.VatSharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/inflop/Inflop.VatSharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>vatsharp-icon-128.png</PackageIcon>
     <Copyright>Copyright © Inflop 2026</Copyright>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -43,6 +43,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
+    <PackageReference Include="MinVer" Version="6.*" PrivateAssets="All" />
   </ItemGroup>
 
 </Project>
