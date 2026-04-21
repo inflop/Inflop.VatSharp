@@ -1,0 +1,44 @@
+name: Publish to NuGet
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: nuget
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet restore src/Inflop.VatSharp.slnx
+
+      - run: dotnet build src/Inflop.VatSharp.slnx --configuration Release --no-restore
+
+      - run: dotnet test src/Inflop.VatSharp.slnx --configuration Release --no-restore --no-build --verbosity normal
+
+      - run: dotnet pack src/Inflop.VatSharp/Inflop.VatSharp.csproj --configuration Release --no-build --output ./nupkg
+
+      - run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - run: dotnet nuget push ./nupkg/*.snupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        continue-on-error: true
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            ./nupkg/*.nupkg \
+            ./nupkg/*.snupkg \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes
