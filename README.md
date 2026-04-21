@@ -332,12 +332,16 @@ var engine = VatCalculationEngine.ForItems<Line>(
     cfg => cfg.NetUnitPrice(l => l.Price).Quantity(l => l.Qty).VatRate(l => l.Rate),
     baseCurrencyRounding: DefaultRounding.ZeroDecimalPlaces);
 
+var jpyResult = engine.Calculate(lines, VatCalculationMethod.FromSumOfNetValues, eurJpy);
+
 // EUR invoice, KWD base (3 decimal places — dinar is divided into 1000 fils):
 ExchangeRate eurKwd = ExchangeRate.Of(CurrencyCode.EUR, CurrencyCode.Of("KWD"), 0.3342m);
 
 var kwdEngine = VatCalculationEngine.ForItems<Line>(
     cfg => cfg.NetUnitPrice(l => l.Price).Quantity(l => l.Qty).VatRate(l => l.Rate),
     baseCurrencyRounding: new DefaultRounding(3));
+
+var kwdResult = kwdEngine.Calculate(lines, VatCalculationMethod.FromSumOfNetValues, eurKwd);
 ```
 
 Both parameters can be set independently — a CHF-denominated invoice settled in JPY would use `Rounding(new SwissRounding())` together with `BaseCurrencyRounding(DefaultRounding.ZeroDecimalPlaces)`.
