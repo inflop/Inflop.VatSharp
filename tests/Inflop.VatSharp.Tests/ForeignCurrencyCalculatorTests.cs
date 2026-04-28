@@ -370,4 +370,64 @@ public class ForeignCurrencyCalculatorTests
         resultIII.TotalVatBase.Value.Should().Be(30.23m);  // round(7.14 × 4.2345)
         resultI.TotalVatBase.Value.Should().Be(30.18m);    // round(131.23 × 0.23) — derived from NetBase
     }
+
+    // ── FCY + PerUnit discount behavior ──────────────────────────────────
+
+    [Fact]
+    public void MethodI_Fcy_PerUnit_NonDivisibleQuantity_CorrectBaseAmounts()
+    {
+        // Tests that discountBehavior is properly propagated from
+        // VatCalculationEngine.Create(...) through to the FCY pipeline.
+        var engine = VatCalculationEngine.Create(discountBehavior: Strategies.Discount.PerUnitAbsoluteDiscountBehavior.Instance);
+
+        var item = new InvoiceLineItem(UnitPrice.Net(10m), Quantity.Of(3), VatRate.Of(23), Discount.OfAmount(5.00m));
+        // PerUnit: discount/qty = 5/3 = 1.6666... → round = 1.67
+        //   effectiveUnit = 8.33; totalNet = 24.99
+        //   VAT (M.I) = round(24.99 × 0.23) = round(5.7477) = 5.75
+        //   Gross = 30.74
+
+        var result = engine.Calculate([item], VatCalculationMethod.FromSumOfNetValues, EurPln);
+
+        // FCY (EUR)
+        result.TotalNet.Value.Should().Be(24.99m);
+        result.TotalVat.Value.Should().Be(5.75m);
+        result.TotalGross.Value.Should().Be(30.74m);
+
+        // Base (PLN) — strategy.BuildSummaryFcy dla M.I:
+        //   NetBase = round(24.99 × 4.2345) = round(105.820155) = 105.82
+        //   VatBase = round(105.82 × 0.23) = round(24.3386) = 24.34
+        //   GrossBase = 105.82 + 24.34 = 130.16
+        //   DiscountBase = round(5.01 × 4.2345) = round(21.214845) = 21.21
+        result.TotalNetBase.Value.Should().Be(105.82m);
+        result.TotalVatBase.Value.Should().Be(24.34m);
+        result.TotalGrossBase.Value.Should().Be(130.16m);
+        result.TotalDiscountBase.Value.Should().Be(21.21m);
+    }
+
+    // ── ToBaseDocumentAmounts — LineItems pozostają w walucie obcej ──────
+
+    [Fact]
+    public void ToBaseDocumentAmounts_LineItems_RemainInForeignCurrency()
+    {
+        // Per art. 106e ust. 11 ustawy o VAT i art. 91 dyrektywy 2006/112/EC:
+        // tylko VAT totals i per-rate summaries muszą być w walucie rozliczeniowej.
+        // LineItems celowo pozostają w walucie faktury — bez tej własności
+        // ktoś nieświadomy mógłby "naprawić" pozorną niespójność.
+        var engine = VatCalculationEngine.Create();
+        var item = new InvoiceLineItem(UnitPrice.Net(100m), Quantity.One, VatRate.Of(23));
+
+        var fcy = engine.Calculate([item], VatCalculationMethod.FromSumOfNetValues, EurPln);
+        var asBase = fcy.ToBaseDocumentAmounts();
+
+        // Totale i VAT summaries są w PLN (base currency)
+        asBase.TotalNet.Value.Should().Be(fcy.TotalNetBase.Value);
+        asBase.TotalVat.Value.Should().Be(fcy.TotalVatBase.Value);
+        asBase.TotalGross.Value.Should().Be(fcy.TotalGrossBase.Value);
+        asBase.VatRateSummaries.Single().TotalNet.Value
+            .Should().Be(fcy.VatRateSummaries.Single().TotalNetBase.Value);
+
+        // ALE LineItems pozostają w EUR — art. 106e ust. 11 ustawy o VAT
+        asBase.LineItems.Should().BeEquivalentTo(fcy.LineItems);
+        asBase.LineItems.Single().NetValue.Value.Should().Be(100m);  // EUR, nie PLN
+    }
 }

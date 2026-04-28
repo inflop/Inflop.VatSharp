@@ -111,6 +111,10 @@ public class DirectEngineTests
         var m3 = engine.Calculate(ArticleItems, VatCalculationMethod.SumOfLineItemVatAmounts);
 
         (m1.TotalVat.Value - m3.TotalVat.Value).Should().Be(0.01m);
+
+        // M.I łamie sum(LineItems.VatAmount) == TotalVat — zachowanie definiujące różnicę
+        // między M.I (VAT od sumy netto) a M.III (suma VAT per linia).
+        m1.LineItems.Sum(li => li.VatAmount.Value).Should().NotBe(m1.TotalVat.Value);
     }
 
     [Fact]
