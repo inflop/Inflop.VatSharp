@@ -50,8 +50,7 @@ internal sealed class FromSumOfGrossValuesStrategy : IVatCalculationStrategy
 
             foreach (var (item, originalIndex) in group)
             {
-                var itemGross = item.TotalGrossWith(discountBehavior, rounding).Round(rounding);
-                var itemDiscount = item.DiscountAmountNetWith(discountBehavior, rounding).Round(rounding);
+                var (itemGross, itemDiscount) = item.CalculateGrossAndNetDiscount(discountBehavior, rounding);
 
                 sumGross += itemGross;
                 sumDiscount += itemDiscount;

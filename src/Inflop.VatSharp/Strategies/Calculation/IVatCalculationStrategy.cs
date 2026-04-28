@@ -18,9 +18,6 @@ internal interface IVatCalculationStrategy
 
     DocumentAmounts Calculate(IReadOnlyList<InvoiceLineItem> lineItems, IRoundingStrategy rounding, IAbsoluteDiscountBehavior discountBehavior);
 
-    DocumentAmounts Calculate(IReadOnlyList<InvoiceLineItem> lineItems, IRoundingStrategy rounding)
-        => Calculate(lineItems, rounding, FromTotalAbsoluteDiscountBehavior.Instance);
-
     /// <summary>
     /// Converts a per-rate FCY summary to base currency using this strategy's authoritative field.
     /// Each strategy knows which field drives the others, so the conversion mirrors that hierarchy.

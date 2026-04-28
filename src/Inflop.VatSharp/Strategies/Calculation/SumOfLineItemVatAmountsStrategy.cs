@@ -28,8 +28,7 @@ internal sealed class SumOfLineItemVatAmountsStrategy : IVatCalculationStrategy
         var itemAmounts = lineItems
             .Select(item =>
             {
-                var net = item.TotalNetWith(discountBehavior, rounding).Round(rounding);
-                var discount = item.DiscountAmountNetWith(discountBehavior, rounding).Round(rounding);
+                var (net, discount) = item.CalculateNetAndDiscount(discountBehavior, rounding);
                 return LineItemAmounts.FromNet(net, item.VatRate, rounding, discount);
             })
             .ToList();
