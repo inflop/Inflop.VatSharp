@@ -28,7 +28,7 @@ public sealed record Quantity : IComparable<Quantity>
     public static Quantity Of(int value) => new(value);
 
     /// <summary>A quantity of exactly one.</summary>
-    public static Quantity One => new(1m);
+    public static readonly Quantity One = Of(1);
 
     /// <inheritdoc />
     public int CompareTo(Quantity? other)

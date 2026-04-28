@@ -95,10 +95,34 @@ public sealed record InvoiceLineItem(UnitPrice UnitPrice, Quantity Quantity, Vat
             : VatRate.GrossFromNet(totalInInputType);
     }
 
+    /// <summary>
+    /// Returns rounded net and net-equivalent discount in a single call,
+    /// avoiding a redundant second invocation of <see cref="TotalNetWith"/>.
+    /// </summary>
+    internal (Money Net, Money Discount) CalculateNetAndDiscount(IAbsoluteDiscountBehavior discountBehavior, IRoundingStrategy rounding)
+    {
+        var net = TotalNetWith(discountBehavior, rounding);
+        var discount = Discount.HasValue ? TotalNetBeforeDiscount - net : Money.Zero;
+        return (net.Round(rounding), discount.Round(rounding));
+    }
+
+    /// <summary>
+    /// Returns rounded gross and net-equivalent discount in a single call,
+    /// avoiding a redundant second invocation of <see cref="TotalGrossWith"/> via
+    /// <see cref="DiscountAmountNetWith"/>.
+    /// </summary>
+    internal (Money Gross, Money NetDiscount) CalculateGrossAndNetDiscount(IAbsoluteDiscountBehavior discountBehavior, IRoundingStrategy rounding)
+    {
+        var gross = TotalGrossWith(discountBehavior, rounding);
+        var netDiscount = Discount.HasValue
+            ? TotalNetBeforeDiscount - VatRate.NetFromGross(gross)
+            : Money.Zero;
+        return (gross.Round(rounding), netDiscount.Round(rounding));
+    }
+
     internal LineItemAmounts Calculate(IRoundingStrategy rounding, IAbsoluteDiscountBehavior discountBehavior)
     {
-        var net = TotalNetWith(discountBehavior, rounding).Round(rounding);
-        var discount = DiscountAmountNetWith(discountBehavior, rounding).Round(rounding);
+        var (net, discount) = CalculateNetAndDiscount(discountBehavior, rounding);
         return LineItemAmounts.FromNet(net, VatRate, rounding, discount);
     }
 

@@ -36,8 +36,7 @@ internal sealed class FromSumOfNetValuesStrategy : IVatCalculationStrategy
 
             foreach (var (item, originalIndex) in group)
             {
-                var itemNet = item.TotalNetWith(discountBehavior, rounding).Round(rounding);
-                var itemDiscount = item.DiscountAmountNetWith(discountBehavior, rounding).Round(rounding);
+                var (itemNet, itemDiscount) = item.CalculateNetAndDiscount(discountBehavior, rounding);
 
                 sumNet += itemNet;
                 sumDiscount += itemDiscount;
