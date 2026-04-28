@@ -619,6 +619,99 @@ public class PerUnitAbsoluteDiscountTests
         result.TotalVat.Value.Should().Be(0m);
         result.TotalGross.Value.Should().Be(0m);
     }
+
+    // ── Combinatorial PerUnit gaps ───────────────────────────────────────
+
+    [Fact]
+    public void MethodI_PerUnit_MultiRate_NonDivisibleQuantity_CorrectPerRateAmounts()
+    {
+        // Linia 1 — niepodzielna: discount/qty = 5/3 = 1.6666... → round = 1.67
+        //   effectiveUnit = 8.33; net = 24.99; discount net = 30 − 24.99 = 5.01
+        // Linia 2 — podzielna: discount/qty = 2/2 = 1.00
+        //   effectiveUnit = 19.00; net = 38.00; discount net = 40 − 38.00 = 2.00
+        var items = new InvoiceLineItem[]
+        {
+            new(UnitPrice.Net(10m), Quantity.Of(3), VatRate.Of(23), Discount.OfAmount(5.00m)),
+            new(UnitPrice.Net(20m), Quantity.Of(2), VatRate.Of(8),  Discount.OfAmount(2.00m)),
+        };
+
+        var result = _perUnit.Calculate(items, VatCalculationMethod.FromSumOfNetValues);
+
+        result.VatRateSummaries.Should().HaveCount(2);
+        result.VatRateSummaries.Single(s => s.VatRate == VatRate.Of(23)).TotalNet.Value.Should().Be(24.99m);
+        result.VatRateSummaries.Single(s => s.VatRate == VatRate.Of(8)).TotalNet.Value.Should().Be(38.00m);
+
+        result.TotalNet.Value.Should().Be(62.99m);
+
+        // VAT M.I per rate: round(VatFromNet(sumNet))
+        //   23%: round(24.99 × 0.23) = round(5.7477) = 5.75
+        //   8%:  round(38.00 × 0.08) = 3.04
+        result.VatRateSummaries.Single(s => s.VatRate == VatRate.Of(23)).TotalVat.Value.Should().Be(5.75m);
+        result.VatRateSummaries.Single(s => s.VatRate == VatRate.Of(8)).TotalVat.Value.Should().Be(3.04m);
+        result.TotalVat.Value.Should().Be(8.79m);
+
+        result.TotalDiscount.Value.Should().Be(7.01m);   // 5.01 + 2.00
+    }
+
+    [Fact]
+    public void MethodIII_PerUnit_DivisibleQuantity_MatchesFromTotal()
+    {
+        // discount/qty = 4/4 = 1.00 (dokładnie podzielna) — PerUnit ≡ FromTotal dla M.III
+        var item = new InvoiceLineItem(
+            UnitPrice.Net(10m), Quantity.Of(4), VatRate.Of(23), Discount.OfAmount(4.00m));
+
+        var resultPerUnit   = _perUnit.Calculate([item], VatCalculationMethod.SumOfLineItemVatAmounts);
+        var resultFromTotal = _fromTotal.Calculate([item], VatCalculationMethod.SumOfLineItemVatAmounts);
+
+        resultPerUnit.TotalNet.Should().Be(resultFromTotal.TotalNet);
+        resultPerUnit.TotalVat.Should().Be(resultFromTotal.TotalVat);
+        resultPerUnit.TotalDiscount.Should().Be(resultFromTotal.TotalDiscount);
+    }
+
+    [Fact]
+    public void MethodIII_PerUnit_MultiRate_PerLineVat_CorrectTotals()
+    {
+        // Linia 1 niepodzielna: net = 24.99, VAT M.III per linia = round(24.99 × 0.23) = 5.75
+        // Linia 2 podzielna:    net = 38.00, VAT M.III per linia = round(38.00 × 0.08) = 3.04
+        var items = new InvoiceLineItem[]
+        {
+            new(UnitPrice.Net(10m), Quantity.Of(3), VatRate.Of(23), Discount.OfAmount(5.00m)),
+            new(UnitPrice.Net(20m), Quantity.Of(2), VatRate.Of(8),  Discount.OfAmount(2.00m)),
+        };
+
+        var result = _perUnit.Calculate(items, VatCalculationMethod.SumOfLineItemVatAmounts);
+
+        // Definiująca własność M.III: sum per-line VAT == TotalVat
+        var sumPerLineVat = result.LineItems.Aggregate(Money.Zero, (acc, li) => acc + li.VatAmount);
+        sumPerLineVat.Should().Be(result.TotalVat);
+
+        result.VatRateSummaries.Single(s => s.VatRate == VatRate.Of(23)).TotalVat.Value.Should().Be(5.75m);
+        result.VatRateSummaries.Single(s => s.VatRate == VatRate.Of(8)).TotalVat.Value.Should().Be(3.04m);
+        result.TotalVat.Value.Should().Be(8.79m);
+    }
+
+    [Fact]
+    public void CalculateLineItem_PerUnitEngine_AbsoluteDiscount_NonDivisibleQuantity()
+    {
+        // discount/qty = 1/3 = 0.3333... → round = 0.33
+        //   effectiveUnit = 12.50 − 0.33 = 12.17; totalNet = 36.51
+        //   VAT = round(36.51 × 0.23) = round(8.3973) = 8.40
+        //   Gross = 36.51 + 8.40 = 44.91
+        //   DiscountAmount net = 12.50×3 − 36.51 = 0.99
+        var item = new InvoiceLineItem(UnitPrice.Net(12.50m), Quantity.Of(3), VatRate.Of(23), Discount.OfAmount(1.00m));
+
+        var result = _perUnit.CalculateLineItem(item);
+
+        result.NetValue.Value.Should().Be(36.51m);
+        result.VatAmount.Value.Should().Be(8.40m);
+        result.GrossValue.Value.Should().Be(44.91m);
+        result.DiscountAmount.Value.Should().Be(0.99m);
+
+        // Kontrast: FromTotal dałoby NetValue = 36.50, DiscountAmount = 1.00
+        var fromTotalResult = _fromTotal.CalculateLineItem(item);
+        fromTotalResult.NetValue.Value.Should().Be(36.50m);
+        fromTotalResult.DiscountAmount.Value.Should().Be(1.00m);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -631,8 +724,7 @@ public class FullDiscountTests
     public void MethodI_100PercentDiscount_AllAmountsZero()
     {
         var engine = VatCalculationEngine.Create();
-        var item = new InvoiceLineItem(
-            UnitPrice.Net(100m), Quantity.One, VatRate.Of(23), Discount.OfPercentage(100m));
+        var item = new InvoiceLineItem(UnitPrice.Net(100m), Quantity.One, VatRate.Of(23), Discount.OfPercentage(100m));
 
         var result = engine.Calculate([item], VatCalculationMethod.FromSumOfNetValues);
 
@@ -646,8 +738,7 @@ public class FullDiscountTests
     public void MethodII_100PercentDiscount_AllAmountsZero()
     {
         var engine = VatCalculationEngine.Create();
-        var item = new InvoiceLineItem(
-            UnitPrice.Gross(123m), Quantity.One, VatRate.Of(23), Discount.OfPercentage(100m));
+        var item = new InvoiceLineItem(UnitPrice.Gross(123m), Quantity.One, VatRate.Of(23), Discount.OfPercentage(100m));
 
         var result = engine.Calculate([item], VatCalculationMethod.FromSumOfGrossValues);
 
@@ -660,8 +751,7 @@ public class FullDiscountTests
     public void MethodIII_100PercentDiscount_AllAmountsZero()
     {
         var engine = VatCalculationEngine.Create();
-        var item = new InvoiceLineItem(
-            UnitPrice.Net(100m), Quantity.One, VatRate.Of(23), Discount.OfPercentage(100m));
+        var item = new InvoiceLineItem(UnitPrice.Net(100m), Quantity.One, VatRate.Of(23), Discount.OfPercentage(100m));
 
         var result = engine.Calculate([item], VatCalculationMethod.SumOfLineItemVatAmounts);
 
@@ -685,11 +775,7 @@ public class MethodIIAbsoluteDiscountTests
         //   VatFromGross: 113.00 × 23/123 = 21.13008 → 21.13 (rounded)
         //   Net: 113.00 − 21.13 = 91.87
         var engine = VatCalculationEngine.Create();
-        var item = new InvoiceLineItem(
-            UnitPrice.Gross(123m),
-            Quantity.One,
-            VatRate.Of(23),
-            Discount.OfAmount(10m));
+        var item = new InvoiceLineItem(UnitPrice.Gross(123m), Quantity.One, VatRate.Of(23), Discount.OfAmount(10m));
 
         var result = engine.Calculate([item], VatCalculationMethod.FromSumOfGrossValues);
 
