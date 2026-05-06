@@ -250,7 +250,7 @@ services.AddSingleton(VatCalculationRegistration.CreateEngine<TDoc, TLine>(cfg =
 ## Key Conventions
 
 - All public result types are immutable; use `readonly record struct` for new value objects
-- **Exception**: `Quantity` and `CurrencyCode` are `sealed record` (reference type), NOT `readonly record struct`. This is intentional — a struct would expose an implicit parameterless constructor allowing `default(T)` to bypass the positive-value / non-empty invariant. `static One` / `static PLN` returning `new(...)` instead of `static readonly` is accepted: `default(sealed record)` is `null`, not a zero-value instance.
+- **Exception**: `Quantity`, `CurrencyCode`, and `VatRate` are `sealed record` (reference type), NOT `readonly record struct`. This is intentional — a struct would expose an implicit parameterless constructor allowing `default(T)` to bypass invariants (`Quantity` positive-value, `CurrencyCode` non-empty, `VatRate` non-null `Symbol`). `static One` / `static PLN` / `static Zero` returning `new(...)` instead of `static readonly` is accepted: `default(sealed record)` is `null`, not a zero-value instance.
 - Validation uses `ArgumentNullException.ThrowIfNull()` and `ArgumentOutOfRangeException`
 - Strategies are stateless — they can and should be singletons
 - The library has no currency handling by design; rounding strategy controls precision

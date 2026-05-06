@@ -14,6 +14,7 @@ EU VAT calculation library compliant with **Council Directive 2006/112/EC** — 
 ## Features
 
 - **Three calculation methods** — net-sum, gross-sum, and per-line VAT (art. 226 of Directive 2006/112/EC)
+- **Per-symbol VAT category grouping** — separate summary rows for "0%", "ZW", "NP" and PEPPOL codes (art. 226)
 - **Zero-friction integration** — fluent mapping engine binds the library to any existing domain model without interfaces, attributes, or inheritance
 - **Foreign currency** — dual-currency results for VAT declarations (art. 91), with per-strategy base-currency conversion
 - **Discounts** — percentage and absolute, at line level (art. 79 lit. b); configurable per-unit vs. from-total behavior
@@ -28,6 +29,7 @@ EU VAT calculation library compliant with **Council Directive 2006/112/EC** — 
 - [Quick start](#quick-start)
 - [Fluent mapping engine](#fluent-mapping-engine)
 - [Discounts](#discounts)
+- [VAT rate symbols and zero-rate categories](#vat-rate-symbols-and-zero-rate-categories)
 - [Foreign currency](#foreign-currency)
 - [Custom rounding](#custom-rounding)
 - [Dependency injection](#dependency-injection)
@@ -188,6 +190,55 @@ var engine = VatCalculationEngine.ForItems<Line>(cfg => cfg
 // Pre-built Discount value object:
 //     .Discount(x => x.Disc)                    // Discount? — absolute or percentage
 ```
+
+## VAT rate symbols and zero-rate categories
+
+Art. 226 pts 8–10 of Directive 2006/112/EC require an invoice to disclose the taxable amount, the rate, and the VAT amount **per rate category**. Several legally distinct categories share the same numerical rate of 0 % — for example Polish "0 %" (zero-rated, art. 83 ustawy o VAT), "ZW" (exempt, art. 43), and "NP" (not subject to VAT / reverse charge) — and must appear as **separate rows** on the invoice and in the JPK_V7M file.
+
+`VatRate.Symbol` is the grouping key for `VatRateSummary` rows. It is part of value-object equality, so two zero-percentage rates with different symbols produce two distinct summary rows.
+
+### Creating a rate with an explicit symbol
+
+```csharp
+VatRate standard = VatRate.Of(23);              // Symbol = "23%" (auto-generated)
+VatRate zeroRated = VatRate.Zero;               // Symbol = "0%"
+VatRate exempt = VatRate.Of(0, "ZW");           // Polish exempt — art. 43 ustawy o VAT
+VatRate notSubject = VatRate.Of(0, "NP");       // not subject — reverse charge / out of scope
+VatRate peppolExempt = VatRate.Of(0, "E");      // PEPPOL Tax Category Code: Exempt
+VatRate peppolReverse = VatRate.Of(0, "AE");    // PEPPOL: VAT Reverse Charge
+```
+
+`VatRate.IsZero` returns `true` for **all** zero-percentage rates regardless of symbol — useful when deciding whether to skip VAT arithmetic.
+
+### Separate summary rows per symbol
+
+```csharp
+using Inflop.VatSharp;
+using Inflop.VatSharp.Enums;
+using Inflop.VatSharp.ValueObjects;
+
+var engine = VatCalculationEngine.Create();
+
+var items = new[]
+{
+    new InvoiceLineItem(UnitPrice.Net(500.00m), Quantity.Of(1), VatRate.Of(23)),
+    new InvoiceLineItem(UnitPrice.Net(100.00m), Quantity.Of(1), VatRate.Zero),             // "0%"
+    new InvoiceLineItem(UnitPrice.Net(200.00m), Quantity.Of(1), VatRate.Of(0, "ZW")),      // exempt
+    new InvoiceLineItem(UnitPrice.Net(300.00m), Quantity.Of(1), VatRate.Of(0, "NP")),      // not subject
+};
+
+DocumentAmounts result = engine.Calculate(items, VatCalculationMethod.FromSumOfNetValues);
+
+// result.VatRateSummaries — one row per (Percentage, Symbol), in input order:
+// [0]  Symbol "23%"  TotalNet 500.00  TotalVat 115.00  TotalGross 615.00
+// [1]  Symbol "0%"   TotalNet 100.00  TotalVat   0.00  TotalGross 100.00
+// [2]  Symbol "ZW"   TotalNet 200.00  TotalVat   0.00  TotalGross 200.00
+// [3]  Symbol "NP"   TotalNet 300.00  TotalVat   0.00  TotalGross 300.00
+//
+// Document totals: Net 1100.00, VAT 115.00, Gross 1215.00
+```
+
+The four zero-rate categories remain distinguishable in `VatRateSummaries` — exactly what JPK_V7M and the EU VAT Directive require for invoice disclosure.
 
 ## Foreign currency
 
