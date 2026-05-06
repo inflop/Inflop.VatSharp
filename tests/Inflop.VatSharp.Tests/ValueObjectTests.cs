@@ -153,6 +153,135 @@ public class VatRateTests
         var net = rate.NetFromGross(gross);
         net.Value.Should().Be(original.Value);
     }
+
+    // ── Symbol property and equality semantics ──────────────────────────────
+
+    [Fact]
+    public void Of_WithSymbol_SetsSymbol()
+    {
+        // Explicit symbol overload preserves the supplied label verbatim
+        VatRate.Of(0m, "ZW").Symbol.Should().Be("ZW");
+    }
+
+    [Theory]
+    [InlineData(23, "23%")]
+    [InlineData(8, "8%")]
+    [InlineData(0, "0%")]
+    public void Of_WithoutSymbol_DefaultsToPercentageString(int percentage, string expectedSymbol)
+    {
+        // Default symbol = invariant-culture "{percentage}%" formatting
+        VatRate.Of((decimal)percentage).Symbol.Should().Be(expectedSymbol);
+    }
+
+    [Fact]
+    public void Of_WithoutSymbol_DefaultsToInvariantDecimalPercentageString()
+    {
+        // 5.5m formatted invariant-culture is "5.5%" (decimal point, never comma)
+        VatRate.Of(5.5m).Symbol.Should().Be("5.5%");
+    }
+
+    [Fact]
+    public void Of_Zero_HasZeroPercentSymbol()
+    {
+        // VatRate.Zero is defined as new(0m, "0%")
+        VatRate.Zero.Symbol.Should().Be("0%");
+    }
+
+    [Fact]
+    public void Of_ZW_NotEqualTo_NP()
+    {
+        // Both have Percentage=0 but different Symbol → distinct value-object identity
+        // → separate VatRateSummary rows in JPK_V7 / art. 226 pts 8–10 reporting
+        var zw = VatRate.Of(0m, "ZW");
+        var np = VatRate.Of(0m, "NP");
+        zw.Should().NotBe(np);
+        (zw == np).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Of_ZW_NotEqualTo_DefaultZero()
+    {
+        // ZW (exempt, art. 43 ustawy o VAT) is legally distinct from 0% (zero-rated, art. 83)
+        // Even though Percentage matches (=0), Symbol differs → not equal
+        VatRate.Of(0m, "ZW").Should().NotBe(VatRate.Of(0m));
+    }
+
+    [Fact]
+    public void Of_SamePercentageAndSymbol_AreEqual()
+    {
+        // Structural equality: same Percentage AND same Symbol → equal
+        var a = VatRate.Of(0m, "ZW");
+        var b = VatRate.Of(0m, "ZW");
+        a.Should().Be(b);
+        (a == b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Of_ZeroOf_EqualsVatRateZero()
+    {
+        // VatRate.Of(0m) defaults Symbol to "0%" — same as VatRate.Zero
+        VatRate.Of(0m).Should().Be(VatRate.Zero);
+        (VatRate.Of(0m) == VatRate.Zero).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Of_IntWithoutSymbol_DefaultsToPercentageString()
+    {
+        // int overload delegates to Of(decimal) → same default symbol formatting
+        VatRate.Of(23).Symbol.Should().Be("23%");
+    }
+
+    [Fact]
+    public void ToString_ReturnsSymbol()
+    {
+        // ToString() returns Symbol verbatim (not "{Percentage}%" anymore)
+        VatRate.Of(0m, "ZW").ToString().Should().Be("ZW");
+        VatRate.Of(23).ToString().Should().Be("23%");
+    }
+
+    [Theory]
+    [InlineData("ZW")]
+    [InlineData("NP")]
+    [InlineData("0%")]
+    public void IsZero_ZeroPercentage_RegardlessOfSymbol(string symbol)
+    {
+        // IsZero is driven solely by Percentage == 0m; Symbol is irrelevant
+        VatRate.Of(0m, symbol).IsZero.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CompareTo_SamePercentage_OrdersBySymbolAlphabetically()
+    {
+        // When Percentage ties, ordinal Symbol compare breaks the tie: 'N' < 'Z' → < 0
+        VatRate.Of(0m, "NP").CompareTo(VatRate.Of(0m, "ZW")).Should().BeLessThan(0);
+        VatRate.Of(0m, "ZW").CompareTo(VatRate.Of(0m, "NP")).Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void CompareTo_DifferentPercentage_OrdersByPercentageFirst()
+    {
+        // Primary key is Percentage: 0% < 23% even when Symbol of 0% sorts later alphabetically
+        VatRate.Of(0m, "ZW").CompareTo(VatRate.Of(23)).Should().BeLessThan(0);
+    }
+
+    [Fact]
+    public void Of_NullSymbol_Throws()
+    {
+        // ArgumentException.ThrowIfNullOrWhiteSpace(symbol) surfaces null as ArgumentException
+        FluentActions.Invoking(() => VatRate.Of(0m, null!))
+            .Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void Of_WhitespaceSymbol_Throws(string symbol)
+    {
+        // Whitespace / empty symbols are rejected — invoice symbol must be a meaningful label
+        FluentActions.Invoking(() => VatRate.Of(0m, symbol))
+            .Should().Throw<ArgumentException>();
+    }
 }
 
 public class DefaultRoundingTests
